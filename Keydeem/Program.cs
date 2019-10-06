@@ -4,6 +4,8 @@ using System.Collections.Generic;
 using System.Drawing;
 using System.Linq;
 using System.Reflection;
+using System.Text.RegularExpressions;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 
@@ -53,10 +55,28 @@ namespace Keydeem {
 
             NativeHot.Add(KeyModifier.Super | KeyModifier.Shift, Keys.R, () => {
                 if(!steam.loggedOn) icon.ShowBalloonTip(0, "Not logged on to Steam", "Log on to Steam before redeeming keys.", ToolTipIcon.Error);
-                else if(!Clipboard.ContainsText()) icon.ShowBalloonTip(0, "Clipboard does not contain text", "Try again.", ToolTipIcon.Error);
+                else if(!Clipboard.ContainsText()) icon.ShowBalloonTip(0, "Clipboard does not contain text", "Copy your key and try again.", ToolTipIcon.Error);
                 else {
-                    string key = Clipboard.GetText();
-                    steam.RedeemKey(key);
+                    MatchCollection matches = new Regex("(\\w{5}\\-\\w{5}\\-\\w{5})").Matches(Clipboard.GetText());
+
+                    if(matches.Count == 0) {
+                        icon.ShowBalloonTip(0, "Clipboard does not contain standard Steam keys", "Keydeem only supports standard 5-5-5 Steam keys. To force redemption, use SUPER+ALT+SHIFT+F.", ToolTipIcon.Error);
+                    }
+
+                    foreach(Match match in matches) {
+                        steam.RedeemKey(match.Value);
+                    }
+                }
+            });
+
+            // I don't know why this is necessary
+            Thread.Sleep(100);
+
+            NativeHot.Add(KeyModifier.Super | KeyModifier.Alt | KeyModifier.Shift, Keys.F, () => {
+                if(!steam.loggedOn) icon.ShowBalloonTip(0, "Not logged on to Steam", "Log on to Steam before redeeming keys.", ToolTipIcon.Error);
+                else if(!Clipboard.ContainsText()) icon.ShowBalloonTip(0, "Clipboard does not contain text", "Copy your key and try again.", ToolTipIcon.Error);
+                else {
+                    steam.RedeemKey(Clipboard.GetText());
                 }
             });
         }
