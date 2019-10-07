@@ -22,13 +22,15 @@ namespace Keydeem {
         private GetLogonDetails askForm;
 
         private Action<bool> onLogOn;
+        private Action<EPurchaseResultDetail, string> onKeyRedeem;
 
         private EResult previousResult = EResult.OK;
 
         internal bool loggedOn { get; private set; } = false;
 
-        public Steam(Action<bool> OnLogOn) {
+        public Steam(Action<bool> OnLogOn, Action<EPurchaseResultDetail, string> OnKeyRedeem) {
             this.onLogOn = OnLogOn;
+            this.onKeyRedeem = OnKeyRedeem;
 
             if(File.Exists("auth.json")) {
                 logOnDetails = JsonConvert.DeserializeObject<SteamUser.LogOnDetails>(File.ReadAllText("auth.json"));
@@ -79,6 +81,9 @@ namespace Keydeem {
                 onLogOn(true);
                 return;
             }
+
+            logOnDetails.LoginKey = null;
+            logOnDetails.SentryFileHash = null;
 
             if(res == EResult.AccountLoginDeniedNeedTwoFactor || res == EResult.TwoFactorCodeMismatch) {
                 askForm.Update(true, true, "Please enter your two-factor code below.");
@@ -199,9 +204,10 @@ namespace Keydeem {
             CMsgClientPurchaseResponse resp = new ClientMsgProtobuf<CMsgClientPurchaseResponse>(msg).Body;
 
             EResult result = (EResult) resp.eresult;
-            
+
             if(result != EResult.OK) {
-                Program.Context.icon.ShowBalloonTip(0, "Key redemption failed", result + " (" + ((EPurchaseResultDetail) resp.purchase_result_details) + ")", ToolTipIcon.Error);
+                onKeyRedeem((EPurchaseResultDetail) resp.purchase_result_details, null);
+                
             } else {
                 KeyValue receipt = new KeyValue();
 
@@ -221,7 +227,7 @@ namespace Keydeem {
                     itemName = string.Join(",", items);
                 }
 
-                Program.Context.icon.ShowBalloonTip(0, "Key redemption successful", "You redeemed " + itemName, ToolTipIcon.Info);
+                onKeyRedeem((EPurchaseResultDetail) resp.purchase_result_details, itemName);
             }
         }
     }

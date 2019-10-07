@@ -8,14 +8,15 @@ using System.Windows.Forms;
 
 namespace Keydeem {
     [Flags]
-    internal enum KeyModifier {
+    public enum KeyModifier {
+        None = 0,
         Alt = 1,
         Control = 2,
         Shift = 4,
         Super = 8
     }
 
-    internal class NativeHot : NativeWindow {
+    public class NativeHot : NativeWindow {
         private static NativeHot window = null;
         private static Dictionary<int, Action> callbacks = new Dictionary<int, Action>();
 

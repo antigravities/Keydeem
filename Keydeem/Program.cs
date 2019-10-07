@@ -1,12 +1,10 @@
-﻿using Keydeem.Properties;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Linq;
 using System.Reflection;
 using System.Text.RegularExpressions;
 using System.Threading;
-using System.Threading.Tasks;
 using System.Windows.Forms;
 
 namespace Keydeem {
@@ -25,8 +23,10 @@ namespace Keydeem {
     }
 
     class KeydeemAppContext : ApplicationContext {
-        internal NotifyIcon icon;
+        private NotifyIcon icon;
         private Steam steam;
+        private Keybindings keybindings;
+        private AdjustKeybindings kbwindow;
 
         private Dictionary<string, MenuItem> items = new Dictionary<string, MenuItem>();
 
@@ -34,6 +34,7 @@ namespace Keydeem {
             Program.Context = this;
 
             items["Exit"] = new MenuItem("Exit", Exit);
+            items["Keybindings"] = new MenuItem("Adjust keybindings...", AdjKeybindings);
 
             icon = new NotifyIcon() {
                 Icon = Icon.ExtractAssociatedIcon(Assembly.GetExecutingAssembly().Location),
@@ -42,7 +43,12 @@ namespace Keydeem {
                 Visible = true
             };
 
-            steam = new Steam((successfulLogon) => {
+            keybindings = Keybindings.Get(new Dictionary<string, Keybinding> {
+                { "Redeem Clipboard", new Keybinding(KeyModifier.Super | KeyModifier.Shift, Keys.R) },
+                { "Force Redeem Clipboard", new Keybinding(KeyModifier.Super | KeyModifier.Shift | KeyModifier.Control, Keys.R) }
+            });
+
+            steam = new Steam(successfulLogon => {
                 if(!successfulLogon) {
                     Exit(null, null);
                     return;
@@ -50,17 +56,20 @@ namespace Keydeem {
 
                 icon.Text = "Keydeem";
 
-                icon.ShowBalloonTip(0, "Logged on to Steam", "Press SUPER+SHIFT+R to redeem keys on your clipboard.", ToolTipIcon.Info);
+                icon.ShowBalloonTip(0, "Logged on to Steam", "Press " + keybindings.bindings["Redeem Clipboard"] + " to redeem keys on your clipboard.", ToolTipIcon.Info);
+            }, (detail, item) => {
+                if(item == null) Program.Context.icon.ShowBalloonTip(0, "Key redemption failed", "" + detail, ToolTipIcon.Error);
+                else Program.Context.icon.ShowBalloonTip(0, "Key redemption successful", "You redeemed " + item, ToolTipIcon.Info);
             });
 
-            NativeHot.Add(KeyModifier.Super | KeyModifier.Shift, Keys.R, () => {
+            NativeHot.Add(keybindings.bindings["Redeem Clipboard"].GetModifiers(), keybindings.bindings["Redeem Clipboard"].Key, () => {
                 if(!steam.loggedOn) icon.ShowBalloonTip(0, "Not logged on to Steam", "Log on to Steam before redeeming keys.", ToolTipIcon.Error);
                 else if(!Clipboard.ContainsText()) icon.ShowBalloonTip(0, "Clipboard does not contain text", "Copy your key and try again.", ToolTipIcon.Error);
                 else {
                     MatchCollection matches = new Regex("(\\w{5}\\-\\w{5}\\-\\w{5})").Matches(Clipboard.GetText());
 
                     if(matches.Count == 0) {
-                        icon.ShowBalloonTip(0, "Clipboard does not contain standard Steam keys", "Keydeem only supports standard 5-5-5 Steam keys. To force redemption, use SUPER+ALT+SHIFT+F.", ToolTipIcon.Error);
+                        icon.ShowBalloonTip(0, "Clipboard does not contain standard Steam keys", "Keydeem only supports standard 5-5-5 Steam keys. To force redemption, use " + keybindings.bindings["Force Redeem Clipboard"] + ".", ToolTipIcon.Error);
                     }
 
                     foreach(Match match in matches) {
@@ -72,7 +81,7 @@ namespace Keydeem {
             // I don't know why this is necessary
             Thread.Sleep(100);
 
-            NativeHot.Add(KeyModifier.Super | KeyModifier.Alt | KeyModifier.Shift, Keys.F, () => {
+            NativeHot.Add(keybindings.bindings["Force Redeem Clipboard"].GetModifiers(), keybindings.bindings["Force Redeem Clipboard"].Key, () => {
                 if(!steam.loggedOn) icon.ShowBalloonTip(0, "Not logged on to Steam", "Log on to Steam before redeeming keys.", ToolTipIcon.Error);
                 else if(!Clipboard.ContainsText()) icon.ShowBalloonTip(0, "Clipboard does not contain text", "Copy your key and try again.", ToolTipIcon.Error);
                 else {
@@ -85,7 +94,18 @@ namespace Keydeem {
             icon.Visible = false;
 
             if(steam != null) steam.Kill();
+            if(kbwindow != null) kbwindow.Dispose();
+
             Application.Exit();
+        }
+
+        void AdjKeybindings(object sender, EventArgs e) {
+            if(kbwindow != null) kbwindow.Activate();
+            else {
+                kbwindow = new AdjustKeybindings(ref keybindings);
+                kbwindow.FormClosed += (a, b) => kbwindow = null;
+                kbwindow.Show();
+            }
         }
     }
 }
