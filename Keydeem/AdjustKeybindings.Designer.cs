@@ -25,6 +25,7 @@ namespace Keydeem {
         /// the contents of this method with the code editor.
         /// </summary>
         private void InitializeComponent() {
+            System.ComponentModel.ComponentResourceManager resources = new System.ComponentModel.ComponentResourceManager(typeof(AdjustKeybindings));
             this.selectedKeybinding = new System.Windows.Forms.ComboBox();
             this.modifierSuper = new System.Windows.Forms.CheckBox();
             this.modifierCtrl = new System.Windows.Forms.CheckBox();
@@ -117,6 +118,7 @@ namespace Keydeem {
             this.Controls.Add(this.modifierSuper);
             this.Controls.Add(this.selectedKeybinding);
             this.FormBorderStyle = System.Windows.Forms.FormBorderStyle.FixedSingle;
+            this.Icon = ((System.Drawing.Icon)(resources.GetObject("$this.Icon")));
             this.MaximizeBox = false;
             this.MinimizeBox = false;
             this.Name = "AdjustKeybindings";
