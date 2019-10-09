@@ -33,6 +33,8 @@ namespace Keydeem {
             this.onKeyRedeem = OnKeyRedeem;
 
             if(File.Exists("auth.json")) {
+                Program.Context.Log("Using saved auth details.");
+
                 logOnDetails = JsonConvert.DeserializeObject<SteamUser.LogOnDetails>(File.ReadAllText("auth.json"));
             }
             
@@ -96,6 +98,8 @@ namespace Keydeem {
         }
 
         private EResult AttemptLogIn() {
+            Program.Context.Log("Attempting login...");
+
             EResult result = EResult.Fail;
 
             client = new SteamClient();
@@ -159,11 +163,11 @@ namespace Keydeem {
 
                 File.WriteAllText("auth.json", JsonConvert.SerializeObject(logOnDetails));
 
-                Console.WriteLine("saved sentry hash");
+                Program.Context.Log("Saved sentry hash");
             });
 
             mgr.Subscribe<SteamUser.LoginKeyCallback>(callback => {
-                Console.WriteLine("accepting new login key");
+                Program.Context.Log("Accepting new login key");
 
                 logOnDetails.Password = null;
                 logOnDetails.ShouldRememberPassword = true;
@@ -182,15 +186,21 @@ namespace Keydeem {
 
             previousResult = result;
 
+            Program.Context.Log("Result: " + result);
+
             return result;
         }
 
         internal void Kill() {
+            Program.Context.Log("Killing Steam...");
+
             if(askForm != null) askForm.Dispose();
             runCallbacks = false;
         }
 
         internal void RedeemKey(string key) {
+            Program.Context.Log("Redeeming " + key);
+
             client.Send(new ClientMsgProtobuf<CMsgClientRegisterKey>(EMsg.ClientRegisterKey) {
                 SourceJobID = client.GetNextJobID(),
                 Body = {
@@ -201,18 +211,19 @@ namespace Keydeem {
 
         public override void HandleMsg(IPacketMsg msg) {
             if(msg.MsgType != EMsg.ClientPurchaseResponse) return;
+
             CMsgClientPurchaseResponse resp = new ClientMsgProtobuf<CMsgClientPurchaseResponse>(msg).Body;
 
             EResult result = (EResult) resp.eresult;
 
             if(result != EResult.OK) {
                 onKeyRedeem((EPurchaseResultDetail) resp.purchase_result_details, null);
-                
+                Program.Context.Log("Redemption failed: " + (EPurchaseResultDetail) resp.purchase_result_details);
             } else {
                 KeyValue receipt = new KeyValue();
 
                 using(MemoryStream stream = new MemoryStream(resp.purchase_receipt_info)) {
-                    if(!receipt.TryReadAsBinary(stream)) Console.WriteLine("Could not process key response");
+                    if(!receipt.TryReadAsBinary(stream)) Program.Context.Log("Could not process key response for some reason. Did Valve change something?");
                 }
 
                 string itemName = "No items added to account.";
@@ -226,6 +237,8 @@ namespace Keydeem {
 
                     itemName = string.Join(",", items);
                 }
+
+                Program.Context.Log((EPurchaseResultDetail) resp.purchase_result_details + ": " + itemName);
 
                 onKeyRedeem((EPurchaseResultDetail) resp.purchase_result_details, itemName);
             }

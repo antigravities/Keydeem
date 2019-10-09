@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
+using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Text.RegularExpressions;
@@ -25,8 +26,16 @@ namespace Keydeem {
     class KeydeemAppContext : ApplicationContext {
         private NotifyIcon icon;
         private Steam steam;
+
         private Keybindings keybindings;
         private AdjustKeybindings kbwindow;
+        private MainWindow window;
+
+        StreamWriter logStream = new StreamWriter("keydeem.log", true) {
+            AutoFlush = true
+        };
+
+        private string log = "";
 
         private Dictionary<string, MenuItem> items = new Dictionary<string, MenuItem>();
 
@@ -41,6 +50,16 @@ namespace Keydeem {
                 ContextMenu = new ContextMenu(items.Values.ToArray()),
                 Text = "Keydeem - Logging in to Steam...",
                 Visible = true
+            };
+
+            icon.DoubleClick += (a,b) => {
+                if(this.window != null) this.window.Activate();
+                else {
+                    this.window = new MainWindow(log);
+                    window.Show();
+
+                    window.FormClosed += (c,d) => window = null;
+                }
             };
 
             keybindings = Keybindings.Get(new Dictionary<string, Keybinding> {
@@ -90,22 +109,43 @@ namespace Keydeem {
             });
         }
 
-        void Exit(object sender, EventArgs e) {
+        private void Exit(object sender, EventArgs e) {
+            Program.Context.Log("Shutting down...");
+
             icon.Visible = false;
 
+            if(window != null) window.Dispose();
             if(steam != null) steam.Kill();
             if(kbwindow != null) kbwindow.Dispose();
+
+            Program.Context.Log("Sayonara!");
+
+            logStream.Dispose();
 
             Application.Exit();
         }
 
-        void AdjKeybindings(object sender, EventArgs e) {
+        private void AdjKeybindings(object sender, EventArgs e) {
             if(kbwindow != null) kbwindow.Activate();
             else {
                 kbwindow = new AdjustKeybindings(ref keybindings);
                 kbwindow.FormClosed += (a, b) => kbwindow = null;
                 kbwindow.Show();
             }
+        }
+
+        internal string PadZero(int number) {
+            if(number < 10) return "0" + number;
+            else return "" + number;
+        }
+
+        internal void Log(string text) {
+            text = "[" + PadZero(DateTime.Now.Month) + "/" + PadZero(DateTime.Now.Day) + "/" + PadZero(DateTime.Now.Year) + " " + PadZero(DateTime.Now.Hour) + ":" + PadZero(DateTime.Now.Minute) + ":" + PadZero(DateTime.Now.Second) + "] " + text;
+
+            log += text + "\r\n";
+            logStream.Write(text + "\n");
+
+            if(window != null) window.Log(text + "\r\n");
         }
     }
 }
